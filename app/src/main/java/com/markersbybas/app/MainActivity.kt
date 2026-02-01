@@ -18,6 +18,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,15 +37,26 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -60,6 +72,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -182,23 +197,73 @@ fun MarkerApp(vm: MarkerViewModel, context: Context) {
 private fun AnimatedTitle() {
     val transition = rememberInfiniteTransition(label = "titlePulse")
     val alpha by transition.animateFloat(
-        initialValue = 0.6f,
+        initialValue = 0.7f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(animation = tween(1200))
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = androidx.compose.animation.core.EaseInOutSine),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+    val scale by transition.animateFloat(
+        initialValue = 0.98f,
+        targetValue = 1.02f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = androidx.compose.animation.core.EaseInOutSine),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "scale"
     )
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+    ) {
+        // App icon/logo placeholder
+        Surface(
+            modifier = Modifier.size(80.dp),
+            color = BasYellow.copy(alpha = 0.1f),
+            shape = CircleShape
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    imageVector = Icons.Default.Place,
+                    contentDescription = null,
+                    tint = BasYellow,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .alpha(alpha)
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
         Text(
             text = "Markers by Bas",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            ),
+            color = BasYellow,
             modifier = Modifier.alpha(alpha)
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "v${BuildConfig.VERSION_NAME}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = BasYellow
-        )
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        Surface(
+            color = BasYellow.copy(alpha = 0.1f),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text(
+                text = "v${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.labelMedium,
+                color = BasYellow.copy(alpha = 0.7f),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+            )
+        }
     }
 }
 
@@ -210,72 +275,100 @@ private fun LoginForm(vm: MarkerViewModel, context: Context) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        color = Color(0xFF111111),
-        shape = RoundedCornerShape(12.dp),
-        tonalElevation = 2.dp,
-        shadowElevation = 6.dp
+            .shadow(12.dp, RoundedCornerShape(20.dp))
+            .border(1.dp, BasYellow.copy(alpha = 0.2f), RoundedCornerShape(20.dp)),
+        color = Color(0xFF0D0D0D),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Online login",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = BasYellow
-                )
-                Button(
-                    onClick = { name = ""; password = "" },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF333333),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("Cancel")
-                }
-            }
+            // Header with icon
+            Icon(
+                imageVector = Icons.Default.Place,
+                contentDescription = null,
+                tint = BasYellow,
+                modifier = Modifier.size(48.dp)
+            )
             Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Welcome",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                ),
+                color = BasYellow
+            )
+            Text(
+                text = "Sign in to access your markers",
+                style = MaterialTheme.typography.bodyMedium,
+                color = BasYellow.copy(alpha = 0.7f)
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Name input
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Your name") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Password input
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Enter password") },
+                label = { Text("Password") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
+            
+            // Error message
             if (vm.loginError.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = vm.loginError,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFFF5555),
-                    textAlign = TextAlign.Center
-                )
-            } else {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    color = Color(0xFFD32F2F).copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = vm.loginError,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFFF5555),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
-            Button(
-                onClick = { vm.login(name, password, context) },
-                colors = ButtonDefaults.buttonColors(containerColor = BasYellow, contentColor = Color.Black),
-                modifier = Modifier.fillMaxWidth()
+            
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            // Login button
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { vm.login(name, password, context) },
+                color = BasYellow,
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Login")
+                Text(
+                    text = "Sign In",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ),
+                    color = Color.Black,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(16.dp)
+                )
             }
         }
     }
@@ -291,62 +384,143 @@ private fun SignedInScreen(
     var expanded by remember { mutableStateOf(false) }
     val selectedName = vm.cloudFiles.firstOrNull { file: CloudFile -> file.id == vm.selectedCloudId }?.name.orEmpty()
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "Signed in as ${vm.onlineUser}",
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Button(
-            onClick = { vm.logout(context) },
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(12.dp, RoundedCornerShape(20.dp))
+            .border(1.dp, BasYellow.copy(alpha = 0.2f), RoundedCornerShape(20.dp)),
+        color = Color(0xFF0D0D0D),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Sign out")
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        if (vm.cloudFiles.isEmpty()) {
-            Text(
-                text = "No cloud files loaded yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = BasYellow,
-                textAlign = TextAlign.Center
-            )
-        } else {
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = !expanded }
+            // User avatar placeholder
+            Surface(
+                modifier = Modifier.size(64.dp),
+                color = BasYellow.copy(alpha = 0.1f),
+                shape = CircleShape
             ) {
-                OutlinedTextField(
-                    value = selectedName,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Select file") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier.menuAnchor()
-                )
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    vm.cloudFiles.forEach { file: CloudFile ->
-                        DropdownMenuItem(
-                            text = { Text(file.name) },
-                            onClick = {
-                                expanded = false
-                                vm.selectCloudProject(file.id)
-                            }
-                        )
-                    }
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Text(
+                        text = vm.onlineUser.firstOrNull()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        ),
+                        color = BasYellow
+                    )
                 }
             }
+            
             Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = onLoadFile,
-                enabled = vm.selectedCloudId.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
-            ) {
-                Text("Load file")
+            
+            Text(
+                text = vm.onlineUser,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                ),
+                color = BasYellow
+            )
+            
+            // Sign out link
+            Text(
+                text = "Sign out",
+                style = MaterialTheme.typography.labelMedium,
+                color = BasYellow.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .clickable { vm.logout(context) }
+                    .padding(vertical = 4.dp)
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(color = BasYellow.copy(alpha = 0.2f), thickness = 1.dp)
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            if (vm.cloudFiles.isEmpty()) {
+                Text(
+                    text = "No files available",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = BasYellow.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Text(
+                    text = "Select a file to load",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = BasYellow.copy(alpha = 0.7f)
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // File selector
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        color = Color(0xFF1A1A1A),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (selectedName.isBlank()) "Choose file..." else selectedName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (selectedName.isBlank()) BasYellow.copy(alpha = 0.5f) else BasYellow
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Expand",
+                                tint = BasYellow
+                            )
+                        }
+                    }
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        vm.cloudFiles.forEach { file: CloudFile ->
+                            DropdownMenuItem(
+                                text = { Text(file.name) },
+                                onClick = {
+                                    expanded = false
+                                    vm.selectCloudProject(file.id)
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // Load button
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(enabled = vm.selectedCloudId.isNotBlank()) { onLoadFile() },
+                    color = if (vm.selectedCloudId.isNotBlank()) BasYellow else BasYellow.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "Load File",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        ),
+                        color = Color.Black,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
             }
         }
     }
@@ -369,42 +543,105 @@ private fun MarkerListScreen(vm: MarkerViewModel, context: Context, onBack: () -
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        // Top header bar with back button, title and actions
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp)),
+            color = Color(0xFF0D0D0D),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Text(
-                text = fileName,
-                style = MaterialTheme.typography.titleMedium,
-                color = BasYellow
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HeartbeatIndicator(isOnline = vm.firebaseOnline)
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { exportKmz(context, fileName, vm.projectState.pts) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("KMZ")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { showSettings = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
-                ) {
-                    Text("⚙", fontSize = 20.sp)
+                    // Back button
+                    Surface(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .clickable { onBack() },
+                        color = Color(0xFF1A1A1A),
+                        shape = CircleShape
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = BasYellow,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    // Title
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = fileName,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            ),
+                            color = BasYellow,
+                            maxLines = 1
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            HeartbeatIndicator(isOnline = vm.firebaseOnline)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (vm.firebaseOnline) "Online" else "Offline",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (vm.firebaseOnline) Color(0xFF4CAF50) else Color(0xFFD32F2F)
+                            )
+                        }
+                    }
+                    
+                    // Export KMZ button
+                    Surface(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .clickable { exportKmz(context, fileName, vm.projectState.pts) },
+                        color = Color(0xFF1A1A1A),
+                        shape = CircleShape
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.Public,
+                                contentDescription = "Export KMZ",
+                                tint = BasYellow,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    // Settings button
+                    Surface(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .clickable { showSettings = true },
+                        color = Color(0xFF1A1A1A),
+                        shape = CircleShape
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = BasYellow,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = onBack,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
-        ) {
-            Text("Back")
-        }
-        Spacer(modifier = Modifier.height(12.dp))
+        
+        Spacer(modifier = Modifier.height(16.dp))
 
         if (markers.isEmpty()) {
             Text(
@@ -468,35 +705,112 @@ private fun SettingsDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = MaterialTheme.shapes.medium,
-            tonalElevation = 4.dp
+            shape = RoundedCornerShape(20.dp),
+            color = Color(0xFF0D0D0D),
+            modifier = Modifier.border(1.dp, BasYellow.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = "Settings", style = MaterialTheme.typography.titleMedium, color = BasYellow)
-                Spacer(modifier = Modifier.height(12.dp))
+            Column(modifier = Modifier.padding(20.dp)) {
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "Show Google Maps", color = BasYellow)
-                    Switch(checked = showMapButtons, onCheckedChange = onMapToggle)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = BasYellow,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Settings",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            ),
+                            color = BasYellow
+                        )
+                    }
+                    Surface(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .clickable { onDismiss() },
+                        color = Color(0xFF1A1A1A),
+                        shape = CircleShape
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = BasYellow,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // Settings options
+                Surface(
+                    color = Color(0xFF1A1A1A),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text(text = "Show Honing", color = BasYellow)
-                    Switch(checked = showHoningButtons, onCheckedChange = onHoningToggle)
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
-                ) {
-                    Text("Close")
+                    Column {
+                        // Google Maps toggle
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Map,
+                                    contentDescription = null,
+                                    tint = BasYellow,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Google Maps button",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = BasYellow
+                                )
+                            }
+                            Switch(checked = showMapButtons, onCheckedChange = onMapToggle)
+                        }
+                        
+                        HorizontalDivider(color = BasYellow.copy(alpha = 0.1f), thickness = 1.dp)
+                        
+                        // Honing toggle
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Navigation,
+                                    contentDescription = null,
+                                    tint = BasYellow,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Navigation button",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = BasYellow
+                                )
+                            }
+                            Switch(checked = showHoningButtons, onCheckedChange = onHoningToggle)
+                        }
+                    }
                 }
             }
         }
@@ -530,99 +844,179 @@ private fun MarkerBlock(
     val actualColor = if (marker.missed) Color(0xFFD32F2F) else BasYellow
     val hasCoords = marker.lat != null && marker.lng != null
 
-    Surface(
-        color = Color.Black,
-        shape = RoundedCornerShape(28.dp),
-        modifier = Modifier.fillMaxWidth()
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(8.dp, RoundedCornerShape(20.dp))
+            .border(1.dp, BasYellow.copy(alpha = 0.3f), RoundedCornerShape(20.dp)),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D0D0D))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            // Header row with marker name and expected time
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = marker.name,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ),
                     color = BasYellow
                 )
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = "Expected",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = BasYellow
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BasYellow.copy(alpha = 0.7f)
                     )
                     Text(
                         text = marker.expectedTime,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                        ),
                         color = BasYellow
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Column(
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = BasYellow.copy(alpha = 0.2f), thickness = 1.dp)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Actual time section - tappable
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showPicker = true }
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { showPicker = true },
+                color = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(12.dp)
             ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Actual Time",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BasYellow.copy(alpha = 0.7f)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = actualDisplay,
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            ),
+                            color = actualColor
+                        )
+                        Text(
+                            text = "tap to edit",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BasYellow.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Distance info
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                if (showDelta) {
+                    Text(
+                        text = "Δ ${formatDistance(deltaDistance)}m",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = BasYellow.copy(alpha = 0.8f)
+                    )
+                }
                 Text(
-                    text = "Actual (tap to edit)",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "Total: ${formatDistance(accumulatedDistance)}m",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                    ),
                     color = BasYellow
                 )
-                Text(
-                    text = actualDisplay,
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = actualColor
-                )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            if (showDelta) {
-                Text(
-                    text = "Δ $arrowLabel ${formatDistance(deltaDistance)}m",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = BasYellow
-                )
-            }
-            Text(
-                text = "Total: ${formatDistance(accumulatedDistance)}m",
-                style = MaterialTheme.typography.bodyMedium,
-                color = BasYellow
-            )
+            
+            // Action buttons
             if (showMapButton || showHoningButton) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = BasYellow.copy(alpha = 0.2f), thickness = 1.dp)
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     if (showMapButton) {
-                        Button(
-                            onClick = {
-                                if (hasCoords) openGoogleMaps(context, marker.lat!!, marker.lng!!, marker.name)
-                            },
-                            enabled = hasCoords,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(enabled = hasCoords) {
+                                    if (hasCoords) openGoogleMaps(context, marker.lat!!, marker.lng!!, marker.name)
+                                },
+                            color = if (hasCoords) Color(0xFF1A1A1A) else Color(0xFF0A0A0A),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Place,
-                                contentDescription = "Open in Maps",
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Place,
+                                    contentDescription = "Open in Maps",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = if (hasCoords) BasYellow else BasYellow.copy(alpha = 0.3f)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Maps",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (hasCoords) BasYellow else BasYellow.copy(alpha = 0.3f)
+                                )
+                            }
                         }
                     }
                     if (showHoningButton) {
-                        Button(
-                            onClick = {
-                                if (hasCoords) {
-                                    onRequestLocation()
-                                    showHoningDialog = true
-                                }
-                            },
-                            enabled = hasCoords,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(enabled = hasCoords) {
+                                    if (hasCoords) {
+                                        onRequestLocation()
+                                        showHoningDialog = true
+                                    }
+                                },
+                            color = if (hasCoords) Color(0xFF1A1A1A) else Color(0xFF0A0A0A),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Navigation,
-                                contentDescription = "Honing",
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Navigation,
+                                    contentDescription = "Honing",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = if (hasCoords) BasYellow else BasYellow.copy(alpha = 0.3f)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Navigate",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (hasCoords) BasYellow else BasYellow.copy(alpha = 0.3f)
+                                )
+                            }
                         }
                     }
                 }
@@ -633,36 +1027,113 @@ private fun MarkerBlock(
     if (showPicker) {
         Dialog(onDismissRequest = { showPicker = false }) {
             Surface(
-                shape = MaterialTheme.shapes.medium,
-                tonalElevation = 4.dp
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF0D0D0D),
+                modifier = Modifier.border(1.dp, BasYellow.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = marker.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = BasYellow
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    TimeWheelPicker(
-                        timeValue = marker.actualTime,
-                        onTimeChange = onTimeChange
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
-                            onClick = {
-                                onNotDetected()
-                                showPicker = false
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = marker.name,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            ),
+                            color = BasYellow
+                        )
+                        Surface(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .clickable { showPicker = false },
+                            color = Color(0xFF1A1A1A),
+                            shape = CircleShape
                         ) {
-                            Text("Not detected")
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close",
+                                    tint = BasYellow,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
-                        Button(
-                            onClick = { showPicker = false },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+                    
+                    // Time picker label
+                    Text(
+                        text = "Set actual time",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = BasYellow.copy(alpha = 0.7f)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Time picker
+                    Surface(
+                        color = Color(0xFF1A1A1A),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Box(modifier = Modifier.padding(16.dp)) {
+                            TimeWheelPicker(
+                                timeValue = marker.actualTime.ifBlank { marker.expectedTime },
+                                onTimeChange = onTimeChange
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+                    
+                    // Action buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    onNotDetected()
+                                    showPicker = false
+                                },
+                            color = Color(0xFFD32F2F).copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Done")
+                            Text(
+                                text = "Not detected",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color(0xFFD32F2F),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(14.dp)
+                            )
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { showPicker = false },
+                            color = BasYellow,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "Done",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                ),
+                                color = Color.Black,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(14.dp)
+                            )
                         }
                     }
                 }
@@ -673,16 +1144,48 @@ private fun MarkerBlock(
     if (showHoningDialog) {
         Dialog(onDismissRequest = { showHoningDialog = false }) {
             Surface(
-                shape = MaterialTheme.shapes.medium,
-                tonalElevation = 4.dp,
-                color = Color.Black
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF0D0D0D),
+                modifier = Modifier.border(1.dp, BasYellow.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = marker.name, style = MaterialTheme.typography.titleMedium, color = BasYellow)
-                    Spacer(modifier = Modifier.height(12.dp))
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = marker.name,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            ),
+                            color = BasYellow
+                        )
+                        Surface(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .clickable { showHoningDialog = false },
+                            color = Color(0xFF1A1A1A),
+                            shape = CircleShape
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close",
+                                    tint = BasYellow,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
                     if (currentUserLocation == null || !hasCoords) {
                         Text(
                             text = "Waiting for location...",
@@ -705,11 +1208,21 @@ private fun MarkerBlock(
                             bearing
                         }
 
-                        Text(
-                            text = "Distance: ${formatDistance(distanceMeters.toDouble())} m",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = BasYellow
-                        )
+                        // Distance badge
+                        Surface(
+                            color = BasYellow.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "${formatDistance(distanceMeters.toDouble())} m",
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                ),
+                                color = BasYellow,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                            )
+                        }
+                        
                         Spacer(modifier = Modifier.height(16.dp))
                         
                         // Compass
@@ -719,15 +1232,8 @@ private fun MarkerBlock(
                         Text(
                             text = "${arrowBearing.toInt()}°",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = BasYellow
+                            color = BasYellow.copy(alpha = 0.7f)
                         )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = { showHoningDialog = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = BasYellow, contentColor = Color.Black)
-                    ) {
-                        Text("Close")
                     }
                 }
             }

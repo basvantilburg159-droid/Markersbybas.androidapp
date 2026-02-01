@@ -366,14 +366,16 @@ class MarkerViewModel : ViewModel() {
             }
         }
 
+        // Only update state.pts, not the entire state object
+        // This preserves other state fields from the web app
         val payload = mapOf(
-            "state" to mapOf("pts" to pts),
+            "state.pts" to pts,
             "updatedAt" to FieldValue.serverTimestamp()
         )
 
         firestore.collection(FIRESTORE_MARKERFILES)
             .document(docId)
-            .set(payload, com.google.firebase.firestore.SetOptions.merge())
+            .update(payload)
             .addOnFailureListener { error ->
                 loginError = error.localizedMessage ?: "Unable to save session."
             }
@@ -431,7 +433,7 @@ fun formatDistance(distanceMeters: Double): String {
 
 fun parseHourMinute(timeValue: String): Pair<Int, Int> {
     val parts = timeValue.split(":")
-    if (parts.size == 2) {
+    if (parts.size >= 2) {
         val hour = parts[0].toIntOrNull() ?: 0
         val minute = parts[1].toIntOrNull() ?: 0
         return hour to minute

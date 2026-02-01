@@ -1,7 +1,10 @@
 package com.markersbybas.app
 
 import android.app.Activity
+import android.content.ClipData
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Bundle
 import android.widget.NumberPicker
@@ -62,9 +65,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.delay
+import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipFile
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 val BasYellow = Color(0xFFF6B000)
 
@@ -109,6 +118,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MarkerApp(vm: MarkerViewModel, context: Context) {
     LaunchedEffect(Unit) {
+        ensureLocationPermission(context)
         vm.loadSettings(context)
     }
 
@@ -193,38 +203,76 @@ private fun LoginForm(vm: MarkerViewModel, context: Context) {
     var name by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = "Sign in", style = MaterialTheme.typography.titleLarge)
-        Spacer(modifier = Modifier.height(12.dp))
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text("Name") },
-            singleLine = true
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation()
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Button(
-            onClick = { vm.login(name, password, context) },
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
+        color = Color(0xFF111111),
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 2.dp,
+        shadowElevation = 6.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Sign in")
-        }
-        if (vm.loginError.isNotBlank()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = vm.loginError,
-                style = MaterialTheme.typography.bodySmall,
-                color = BasYellow,
-                textAlign = TextAlign.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Online login",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = BasYellow
+                )
+                Button(
+                    onClick = { name = ""; password = "" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF333333),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Cancel")
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Your name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Enter password") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (vm.loginError.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = vm.loginError,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFFF5555),
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            Button(
+                onClick = { vm.login(name, password, context) },
+                colors = ButtonDefaults.buttonColors(containerColor = BasYellow, contentColor = Color.Black),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Login")
+            }
         }
     }
 }
@@ -310,6 +358,9 @@ private fun MarkerListScreen(vm: MarkerViewModel, context: Context, onBack: () -
         if (vm.showHoningButtons) {
             ensureLocationPermission(context)
             vm.startLocationUpdates(context)
+            vm.startHeadingUpdates(context)
+        } else {
+            vm.stopHeadingUpdates()
         }
     }
 
@@ -326,6 +377,13 @@ private fun MarkerListScreen(vm: MarkerViewModel, context: Context, onBack: () -
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HeartbeatIndicator(isOnline = vm.firebaseOnline)
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = { exportKmz(context, fileName, vm.projectState.pts) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
+                ) {
+                    Text("KMZ")
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = { showSettings = true },
@@ -353,14 +411,15 @@ private fun MarkerListScreen(vm: MarkerViewModel, context: Context, onBack: () -
             )
         } else {
             val deltaDistances = markers.mapIndexed { index: Int, marker: MarkerRow ->
-                computeDeltaDistance(marker, markers.getOrNull(index - 1))
+                computeDeltaDistance(marker, markers.getOrNull(index + 1))
             }
             val accumulatedDistances = buildAccumulatedDistances(deltaDistances)
             markers.forEachIndexed { index: Int, marker: MarkerRow ->
                 val prevName = markers.getOrNull(index - 1)?.name.orEmpty()
                 val arrowLabel = if (prevName.isBlank()) marker.name else "$prevName → ${marker.name}"
-                val deltaDistance = deltaDistances[index]
-                val accumulatedDistance = accumulatedDistances[index]
+                val deltaDistance = if (index == 0) 0.0 else computeDeltaDistance(markers[index - 1], marker)
+                val accumulatedDistance = if (index == 0) 0.0 else accumulatedDistances[index - 1]
+                val showDelta = index > 0
 
                 MarkerBlock(
                     marker = marker,
@@ -368,6 +427,8 @@ private fun MarkerListScreen(vm: MarkerViewModel, context: Context, onBack: () -
                     deltaDistance = deltaDistance,
                     accumulatedDistance = accumulatedDistance,
                     currentUserLocation = vm.currentUserLocation,
+                    deviceHeading = vm.deviceHeading,
+                    showDelta = showDelta,
                     showMapButton = vm.showMapButtons,
                     showHoningButton = vm.showHoningButtons,
                     onRequestLocation = {
@@ -445,6 +506,8 @@ private fun MarkerBlock(
     deltaDistance: Double,
     accumulatedDistance: Double,
     currentUserLocation: Location?,
+    deviceHeading: Float?,
+    showDelta: Boolean,
     showMapButton: Boolean,
     showHoningButton: Boolean,
     onRequestLocation: () -> Unit,
@@ -505,16 +568,18 @@ private fun MarkerBlock(
                 )
                 Text(
                     text = actualDisplay,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineLarge,
                     color = actualColor
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Δ $arrowLabel ${formatDistance(deltaDistance)}m",
-                style = MaterialTheme.typography.bodyMedium,
-                color = BasYellow
-            )
+            if (showDelta) {
+                Text(
+                    text = "Δ $arrowLabel ${formatDistance(deltaDistance)}m",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = BasYellow
+                )
+            }
             Text(
                 text = "Total: ${formatDistance(accumulatedDistance)}m",
                 style = MaterialTheme.typography.bodyMedium,
@@ -619,6 +684,12 @@ private fun MarkerBlock(
                         }
                         val distanceMeters = currentUserLocation.distanceTo(target)
                         val bearing = (currentUserLocation.bearingTo(target) + 360f) % 360f
+                        val heading = deviceHeading
+                        val arrowBearing = if (heading != null) {
+                            (bearing - heading + 360f) % 360f
+                        } else {
+                            bearing
+                        }
 
                         Text(
                             text = "Distance: ${formatDistance(distanceMeters.toDouble())} m",
@@ -630,11 +701,11 @@ private fun MarkerBlock(
                             text = "➤",
                             fontSize = 96.sp,
                             color = BasYellow,
-                            modifier = Modifier.graphicsLayer(rotationZ = bearing)
+                            modifier = Modifier.graphicsLayer(rotationZ = arrowBearing)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "${bearing.toInt()}°",
+                            text = "${arrowBearing.toInt()}°",
                             style = MaterialTheme.typography.bodySmall,
                             color = BasYellow
                         )
@@ -668,6 +739,116 @@ private fun HeartbeatIndicator(isOnline: Boolean) {
             .alpha(alpha)
             .background(color, CircleShape)
     )
+}
+
+private fun exportKmz(context: Context, fileName: String, markers: List<MarkerRow>) {
+    android.util.Log.d("KML_EXPORT", "exportKmz called with ${markers.size} markers")
+    markers.forEach { m ->
+        android.util.Log.d("KML_EXPORT", "Marker: ${m.name}, lat=${m.lat}, lng=${m.lng}")
+    }
+    
+    val kmlContent = buildKml(markers, fileName)
+    android.util.Log.d("KML_EXPORT", "Generated KML: $kmlContent")
+
+    val kmlFile = File(context.cacheDir, "doc.kml")
+    val kmzFile = File(context.cacheDir, "$fileName.kmz")
+
+    try {
+        kmlFile.writer().use { it.write(kmlContent) }
+
+        ZipOutputStream(FileOutputStream(kmzFile)).use { zipOut ->
+            val zipEntry = ZipEntry(kmlFile.name)
+            zipOut.putNextEntry(zipEntry)
+            kmlFile.inputStream().use { it.copyTo(zipOut) }
+            zipOut.closeEntry()
+        }
+
+        openGeoFile(context, kmzFile)
+    } catch (e: Exception) {
+        android.util.Log.e("KML_EXPORT", "Error exporting KMZ", e)
+    } finally {
+        if (kmlFile.exists()) kmlFile.delete()
+    }
+}
+
+private fun openGeoFile(context: Context, file: File) {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    android.util.Log.d("KML_EXPORT", "Sharing URI: $uri")
+
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/vnd.google-earth.kmz")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    val chooser = Intent.createChooser(intent, "Open with").apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    val resInfoList = context.packageManager.queryIntentActivities(chooser, PackageManager.MATCH_DEFAULT_ONLY)
+    for (resolveInfo in resInfoList) {
+        val packageName = resolveInfo.activityInfo.packageName
+        context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    try {
+        context.startActivity(chooser)
+    } catch (e: Exception) {
+        android.util.Log.e("KML_EXPORT", "Failed to open KMZ file", e)
+        // Fallback to a generic send intent if view fails
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            putExtra(Intent.EXTRA_STREAM, uri)
+            type = "application/vnd.google-earth.kmz"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(Intent.createChooser(sendIntent, "Share KMZ").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (e2: Exception) {
+            android.util.Log.e("KML_EXPORT", "Also failed to share KMZ file", e2)
+        }
+    }
+}
+
+private fun buildKml(markers: List<MarkerRow>, name: String): String {
+    val coords = markers.mapNotNull { marker ->
+        val lat = marker.lat
+        val lng = marker.lng
+        if (lat == null || lng == null) return@mapNotNull null
+        val latStr = String.format(java.util.Locale.US, "%.6f", lat)
+        val lngStr = String.format(java.util.Locale.US, "%.6f", lng)
+        Triple(latStr, lngStr, marker.name)
+    }
+
+    val placemarksList = coords.map { (latStr, lngStr, markerName) ->
+        "<Placemark><name>${escapeXml(markerName)}</name><Point><coordinates>$lngStr,$latStr,0</coordinates></Point></Placemark>"
+    }
+
+    val firstCoord = coords.firstOrNull()
+    val lookAtStr = if (firstCoord != null) {
+        "<LookAt><longitude>${firstCoord.second}</longitude><latitude>${firstCoord.first}</latitude><range>1000</range></LookAt>"
+    } else ""
+
+    val sb = StringBuilder()
+    sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+    sb.append("<kml xmlns=\"http://www.opengis.net/kml/2.2\">")
+    sb.append("<Document>")
+    sb.append("<name>${escapeXml(name)}</name>")
+    sb.append("<open>1</open>")
+    sb.append(lookAtStr)
+    placemarksList.forEach { sb.append(it) }
+    sb.append("</Document>")
+    sb.append("</kml>")
+    
+    return sb.toString()
+}
+
+private fun escapeXml(value: String): String {
+    return value
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
 }
 
 @Composable

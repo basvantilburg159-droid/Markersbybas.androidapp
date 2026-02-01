@@ -5,6 +5,10 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.location.Location
 import android.net.Uri
 import android.os.Looper
@@ -19,6 +23,8 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.FieldValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -54,20 +60,26 @@ class MarkerViewModel : ViewModel() {
         private set
     var onlineUser by mutableStateOf("")
         private set
+    var deviceHeading by mutableStateOf<Float?>(null)
+        private set
 
     private var locationClient: FusedLocationProviderClient? = null
     private var locationCallback: LocationCallback? = null
+    private var cloudFilesListener: ListenerRegistration? = null
+    private var cloudProjectListener: ListenerRegistration? = null
+    private var sensorManager: SensorManager? = null
+    private var headingListener: SensorEventListener? = null
 
     fun loadSettings(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME_VM, Context.MODE_PRIVATE)
         showMapButtons = prefs.getBoolean(PREF_SHOW_MAP, true)
-        showHoningButtons = prefs.getBoolean(PREF_SHOW_HONING, false)
+        showHoningButtons = prefs.getBoolean(PREF_SHOW_HONING, true)
         val user = auth.currentUser
         if (user != null) {
             isAuthed = true
             firebaseOnline = true
             onlineUser = "Guest"
-            loadCloudFiles()
+            startCloudFilesListener()
         } else {
             auth.signInAnonymously()
                 .addOnSuccessListener { result ->
@@ -76,7 +88,7 @@ class MarkerViewModel : ViewModel() {
                         isAuthed = true
                         firebaseOnline = true
                         onlineUser = "Guest"
-                        loadCloudFiles()
+                        startCloudFilesListener()
                     } else {
                         firebaseOnline = false
                     }
@@ -95,7 +107,7 @@ class MarkerViewModel : ViewModel() {
             isAuthed = true
             firebaseOnline = true
             onlineUser = name.trim().ifBlank { "Guest" }
-            loadCloudFiles()
+            startCloudFilesListener()
             return
         }
         auth.signInAnonymously()
@@ -105,7 +117,7 @@ class MarkerViewModel : ViewModel() {
                     isAuthed = true
                     firebaseOnline = true
                     onlineUser = name.trim().ifBlank { "Guest" }
-                    loadCloudFiles()
+                    startCloudFilesListener()
                 } else {
                     loginError = "Authentication failed."
                     firebaseOnline = false
@@ -133,16 +145,18 @@ class MarkerViewModel : ViewModel() {
 
     fun loadCloudProject(id: String) {
         selectedCloudId = id
-        firestore.collection(FIRESTORE_MARKERFILES)
+        cloudProjectListener?.remove()
+        cloudProjectListener = firestore.collection(FIRESTORE_MARKERFILES)
             .document(id)
-            .get()
-            .addOnSuccessListener { snapshot ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    loginError = error.localizedMessage ?: "Unable to load session."
+                    return@addSnapshotListener
+                }
+                if (snapshot == null || !snapshot.exists()) return@addSnapshotListener
                 val state = snapshot.get("state") as? Map<*, *>
                 val pts = parseMarkerRows(state?.get("pts") ?: snapshot.get("pts"))
                 projectState = ProjectState(pts = pts)
-            }
-            .addOnFailureListener { error ->
-                loginError = error.localizedMessage ?: "Unable to load session."
             }
     }
 
@@ -150,7 +164,8 @@ class MarkerViewModel : ViewModel() {
         val updated = projectState.pts.mapIndexed { i, marker ->
             if (i == index) marker.copy(actualTime = time, missed = isMissed) else marker
         }
-        projectState = projectState.copy(pts = updated)
+        projectState = projectState.copy(pts = shiftExpectedTimes(updated, index, time, isMissed))
+        saveCloudProject()
     }
 
     fun toggleMapButtons(context: Context, enabled: Boolean) {
@@ -181,8 +196,8 @@ class MarkerViewModel : ViewModel() {
         locationClient = client
         if (locationCallback != null) return
 
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000L)
-            .setMinUpdateIntervalMillis(1000L)
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 250L)
+            .setMinUpdateIntervalMillis(0L)
             .build()
 
         val callback = object : LocationCallback() {
@@ -194,12 +209,49 @@ class MarkerViewModel : ViewModel() {
         client.requestLocationUpdates(request, callback, Looper.getMainLooper())
     }
 
+    fun startHeadingUpdates(context: Context) {
+        if (headingListener != null) return
+        val manager = sensorManager ?: context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        sensorManager = manager
+        val rotationSensor = manager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                if (event.sensor.type != Sensor.TYPE_ROTATION_VECTOR) return
+                val rotationMatrix = FloatArray(9)
+                SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+                val orientation = FloatArray(3)
+                SensorManager.getOrientation(rotationMatrix, orientation)
+                val azimuthRad = orientation[0]
+                val azimuthDeg = Math.toDegrees(azimuthRad.toDouble()).toFloat()
+                deviceHeading = (azimuthDeg + 360f) % 360f
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        }
+        headingListener = listener
+        manager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+    }
+
+    fun stopHeadingUpdates() {
+        val manager = sensorManager
+        val listener = headingListener
+        if (manager != null && listener != null) {
+            manager.unregisterListener(listener)
+        }
+        headingListener = null
+    }
+
     override fun onCleared() {
         super.onCleared()
         locationCallback?.let { callback ->
             locationClient?.removeLocationUpdates(callback)
         }
         locationCallback = null
+        cloudFilesListener?.remove()
+        cloudFilesListener = null
+        cloudProjectListener?.remove()
+        cloudProjectListener = null
+        stopHeadingUpdates()
     }
 
     private fun loadCloudFiles() {
@@ -221,6 +273,28 @@ class MarkerViewModel : ViewModel() {
             }
     }
 
+    private fun startCloudFilesListener() {
+        if (cloudFilesListener != null) return
+        cloudFilesListener = firestore.collection(FIRESTORE_MARKERFILES)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    loginError = error.localizedMessage ?: "Unable to load sessions."
+                    return@addSnapshotListener
+                }
+                if (snapshot == null) return@addSnapshotListener
+                cloudFiles = snapshot.documents.map { doc ->
+                    CloudFile(
+                        id = doc.id,
+                        name = doc.getString("name") ?: doc.id
+                    )
+                }
+                if (cloudFiles.isNotEmpty() && selectedCloudId.isBlank()) {
+                    selectedCloudId = cloudFiles.first().id
+                }
+            }
+        loadCloudFiles()
+    }
+
     private fun parseMarkerRows(raw: Any?): List<MarkerRow> {
         val rows = raw as? List<*> ?: return emptyList()
         return rows.mapNotNull { entry ->
@@ -230,12 +304,79 @@ class MarkerViewModel : ViewModel() {
                 expectedTime = map["expectedTime"] as? String ?: map["expectedtime"] as? String ?: "",
                 actualTime = map["actualTime"] as? String ?: map["time"] as? String ?: "",
                 missed = map["missed"] as? Boolean ?: false,
-                lat = (map["lat"] as? Number)?.toDouble()
-                    ?: (map["latitude"] as? Number)?.toDouble(),
-                lng = (map["lng"] as? Number)?.toDouble()
-                    ?: (map["longitude"] as? Number)?.toDouble()
+                lat = parseDouble(map["lat"]) ?: parseDouble(map["latitude"]),
+                lng = parseDouble(map["lng"]) ?: parseDouble(map["longitude"]),
+                distance = parseDouble(map["distance"]) ?: parseDouble(map["dist"])
             )
         }
+    }
+
+    private fun parseDouble(value: Any?): Double? {
+        return when (value) {
+            is Number -> value.toDouble()
+            is String -> {
+                val trimmed = value.trim()
+                if (trimmed.isBlank()) null
+                else trimmed.replace(',', '.').toDoubleOrNull()
+            }
+            else -> null
+        }
+    }
+
+    private fun shiftExpectedTimes(
+        pts: List<MarkerRow>,
+        index: Int,
+        actualTime: String,
+        isMissed: Boolean
+    ): List<MarkerRow> {
+        if (isMissed || actualTime.isBlank()) return pts
+        val expectedAtIndex = pts.getOrNull(index)?.expectedTime ?: return pts
+        val expectedSec = parseTimeToSeconds(expectedAtIndex) ?: return pts
+        val actualSec = parseTimeToSeconds(actualTime) ?: return pts
+        val deltaSec = actualSec - expectedSec
+        if (deltaSec == 0) return pts
+
+        return pts.mapIndexed { i, marker ->
+            if (i <= index) marker
+            else {
+                val markerExpected = parseTimeToSeconds(marker.expectedTime)
+                if (markerExpected == null) marker
+                else marker.copy(expectedTime = formatTimeFromSeconds(markerExpected + deltaSec))
+            }
+        }
+    }
+
+    private fun saveCloudProject() {
+        val docId = selectedCloudId
+        if (docId.isBlank()) return
+        if (!isAuthed) return
+
+        val pts = projectState.pts.map { marker ->
+            mutableMapOf<String, Any?>(
+                "markername" to marker.name,
+                "expectedtime" to marker.expectedTime,
+                "time" to marker.actualTime,
+                "missed" to marker.missed,
+                "latitude" to marker.lat,
+                "longitude" to marker.lng
+            ).apply {
+                if (marker.distance != null) {
+                    this["distance"] = marker.distance
+                }
+            }
+        }
+
+        val payload = mapOf(
+            "state" to mapOf("pts" to pts),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+
+        firestore.collection(FIRESTORE_MARKERFILES)
+            .document(docId)
+            .set(payload, com.google.firebase.firestore.SetOptions.merge())
+            .addOnFailureListener { error ->
+                loginError = error.localizedMessage ?: "Unable to save session."
+            }
     }
 }
 
@@ -250,26 +391,30 @@ data class MarkerRow(
     val actualTime: String = "",
     val missed: Boolean = false,
     val lat: Double? = null,
-    val lng: Double? = null
+    val lng: Double? = null,
+    val distance: Double? = null
 )
 
 data class ProjectState(
     val pts: List<MarkerRow> = emptyList()
 )
 
-fun computeDeltaDistance(current: MarkerRow, previous: MarkerRow?): Double {
-    if (previous?.lat == null || previous.lng == null || current.lat == null || current.lng == null) {
-        return 0.0
+fun computeDeltaDistance(current: MarkerRow, next: MarkerRow?): Double {
+    if (current.distance != null) {
+        return current.distance
     }
-    val previousLocation = Location("previous").apply {
-        latitude = previous.lat
-        longitude = previous.lng
+    if (next?.lat == null || next.lng == null || current.lat == null || current.lng == null) {
+        return 0.0
     }
     val currentLocation = Location("current").apply {
         latitude = current.lat
         longitude = current.lng
     }
-    return previousLocation.distanceTo(currentLocation).toDouble()
+    val nextLocation = Location("next").apply {
+        latitude = next.lat
+        longitude = next.lng
+    }
+    return currentLocation.distanceTo(nextLocation).toDouble()
 }
 
 fun buildAccumulatedDistances(deltaDistances: List<Double>): List<Double> {
@@ -292,6 +437,23 @@ fun parseHourMinute(timeValue: String): Pair<Int, Int> {
         return hour to minute
     }
     return 0 to 0
+}
+
+fun parseTimeToSeconds(timeValue: String): Int? {
+    val parts = timeValue.trim().split(":")
+    if (parts.size < 2) return null
+    val hour = parts.getOrNull(0)?.toIntOrNull() ?: return null
+    val minute = parts.getOrNull(1)?.toIntOrNull() ?: return null
+    val second = parts.getOrNull(2)?.toIntOrNull() ?: 0
+    return hour * 3600 + minute * 60 + second
+}
+
+fun formatTimeFromSeconds(totalSeconds: Int): String {
+    val normalized = ((totalSeconds % 86400) + 86400) % 86400
+    val hour = normalized / 3600
+    val minute = (normalized % 3600) / 60
+    val second = normalized % 60
+    return "${formatTwoDigits(hour)}:${formatTwoDigits(minute)}:${formatTwoDigits(second)}"
 }
 
 fun formatTwoDigits(value: Int): String = String.format(Locale.US, "%02d", value)

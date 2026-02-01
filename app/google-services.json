@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "767941633047",
+    "project_id": "markers-by-bas",
+    "storage_bucket": "markers-by-bas.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:767941633047:android:228ea2137eda79fdade852",
+        "android_client_info": {
+          "package_name": "com.markersbybas.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCcQAl8e2FV4I-uTdy2Vc_OkonVVzPFjHg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

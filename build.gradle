@@ -1,0 +1,17 @@
+buildscript {
+    ext {
+        kotlin_version = '2.2.10'
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:9.0.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "com.google.gms:google-services:4.4.0"
+        classpath 'org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.2.10'
+    }
+}
+
+// Repositories are managed in settings.gradle via dependencyResolutionManagement

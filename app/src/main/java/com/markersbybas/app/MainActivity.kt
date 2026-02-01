@@ -35,12 +35,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -389,7 +393,7 @@ private fun MarkerListScreen(vm: MarkerViewModel, context: Context, onBack: () -
                     onClick = { showSettings = true },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
                 ) {
-                    Text("⚙")
+                    Text("⚙", fontSize = 20.sp)
                 }
             }
         }
@@ -596,7 +600,11 @@ private fun MarkerBlock(
                             enabled = hasCoords,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
                         ) {
-                            Text("Maps")
+                            Icon(
+                                imageVector = Icons.Default.Place,
+                                contentDescription = "Open in Maps",
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                     if (showHoningButton) {
@@ -610,7 +618,11 @@ private fun MarkerBlock(
                             enabled = hasCoords,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
                         ) {
-                            Text("Honing")
+                            Icon(
+                                imageVector = Icons.Default.Navigation,
+                                contentDescription = "Honing",
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
@@ -662,13 +674,14 @@ private fun MarkerBlock(
         Dialog(onDismissRequest = { showHoningDialog = false }) {
             Surface(
                 shape = MaterialTheme.shapes.medium,
-                tonalElevation = 4.dp
+                tonalElevation = 4.dp,
+                color = Color.Black
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "Honing", style = MaterialTheme.typography.titleMedium, color = BasYellow)
+                    Text(text = marker.name, style = MaterialTheme.typography.titleMedium, color = BasYellow)
                     Spacer(modifier = Modifier.height(12.dp))
                     if (currentUserLocation == null || !hasCoords) {
                         Text(
@@ -677,6 +690,7 @@ private fun MarkerBlock(
                             color = BasYellow,
                             textAlign = TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.height(100.dp))
                     } else {
                         val target = Location("marker").apply {
                             latitude = marker.lat!!
@@ -693,33 +707,155 @@ private fun MarkerBlock(
 
                         Text(
                             text = "Distance: ${formatDistance(distanceMeters.toDouble())} m",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyLarge,
                             color = BasYellow
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "➤",
-                            fontSize = 96.sp,
-                            color = BasYellow,
-                            modifier = Modifier.graphicsLayer(rotationZ = arrowBearing)
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Compass
+                        CompassView(arrowBearing = arrowBearing)
+                        
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "${arrowBearing.toInt()}°",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = BasYellow
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = { showHoningDialog = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = BasYellow)
+                        colors = ButtonDefaults.buttonColors(containerColor = BasYellow, contentColor = Color.Black)
                     ) {
                         Text("Close")
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CompassView(arrowBearing: Float) {
+    val compassSize = 200.dp
+    
+    Box(
+        modifier = Modifier.size(compassSize),
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.foundation.Canvas(
+            modifier = Modifier.size(compassSize)
+        ) {
+            val center = androidx.compose.ui.geometry.Offset(size.width / 2, size.height / 2)
+            val radius = size.minDimension / 2 - 25f
+            
+            // Draw outer circle
+            drawCircle(
+                color = BasYellow,
+                radius = radius + 5f,
+                center = center,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
+            )
+            
+            // Draw tick marks
+            for (i in 0 until 360 step 10) {
+                val angleRad = Math.toRadians(i.toDouble() - 90).toFloat()
+                val isMajor = i % 90 == 0
+                val isMedium = i % 30 == 0
+                val tickLength = when {
+                    isMajor -> 0f  // Skip cardinal directions - we'll draw letters
+                    isMedium -> 12f
+                    else -> 6f
+                }
+                if (tickLength > 0) {
+                    val startRadius = radius - tickLength
+                    val endRadius = radius
+                    
+                    val startX = center.x + startRadius * kotlin.math.cos(angleRad)
+                    val startY = center.y + startRadius * kotlin.math.sin(angleRad)
+                    val endX = center.x + endRadius * kotlin.math.cos(angleRad)
+                    val endY = center.y + endRadius * kotlin.math.sin(angleRad)
+                    
+                    drawLine(
+                        color = BasYellow,
+                        start = androidx.compose.ui.geometry.Offset(startX, startY),
+                        end = androidx.compose.ui.geometry.Offset(endX, endY),
+                        strokeWidth = if (isMedium) 2f else 1f
+                    )
+                }
+            }
+            
+            // Draw arrow pointing to target (rotated by arrowBearing)
+            val arrowAngleRad = Math.toRadians(arrowBearing.toDouble() - 90).toFloat()
+            val arrowLength = radius - 35f
+            
+            // Arrow tip (red part - pointing to target)
+            val tipX = center.x + arrowLength * kotlin.math.cos(arrowAngleRad)
+            val tipY = center.y + arrowLength * kotlin.math.sin(arrowAngleRad)
+            
+            // Arrow base points (for triangle)
+            val baseOffset = 15f
+            val perpAngle = arrowAngleRad + (Math.PI / 2).toFloat()
+            val base1X = center.x + baseOffset * kotlin.math.cos(perpAngle)
+            val base1Y = center.y + baseOffset * kotlin.math.sin(perpAngle)
+            val base2X = center.x - baseOffset * kotlin.math.cos(perpAngle)
+            val base2Y = center.y - baseOffset * kotlin.math.sin(perpAngle)
+            
+            // Draw red arrow (pointing to target)
+            val redPath = androidx.compose.ui.graphics.Path().apply {
+                moveTo(tipX, tipY)
+                lineTo(base1X, base1Y)
+                lineTo(center.x, center.y)
+                close()
+            }
+            drawPath(redPath, color = Color(0xFFE53935))
+            
+            val redPath2 = androidx.compose.ui.graphics.Path().apply {
+                moveTo(tipX, tipY)
+                lineTo(base2X, base2Y)
+                lineTo(center.x, center.y)
+                close()
+            }
+            drawPath(redPath2, color = Color(0xFFE53935))
+            
+            // Draw white/gray arrow (opposite direction)
+            val tailAngleRad = arrowAngleRad + Math.PI.toFloat()
+            val tailX = center.x + arrowLength * kotlin.math.cos(tailAngleRad)
+            val tailY = center.y + arrowLength * kotlin.math.sin(tailAngleRad)
+            
+            val whitePath = androidx.compose.ui.graphics.Path().apply {
+                moveTo(tailX, tailY)
+                lineTo(base1X, base1Y)
+                lineTo(center.x, center.y)
+                close()
+            }
+            drawPath(whitePath, color = Color.White)
+            
+            val whitePath2 = androidx.compose.ui.graphics.Path().apply {
+                moveTo(tailX, tailY)
+                lineTo(base2X, base2Y)
+                lineTo(center.x, center.y)
+                close()
+            }
+            drawPath(whitePath2, color = Color.White)
+            
+            // Draw center dot
+            drawCircle(
+                color = BasYellow,
+                radius = 6f,
+                center = center
+            )
+        }
+        
+        // Cardinal directions positioned on top of the compass
+        Text("N", color = BasYellow, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
+        Text("S", color = BasYellow, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
+        Text("E", color = BasYellow, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 10.dp))
+        Text("W", color = BasYellow, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            modifier = Modifier.align(Alignment.CenterStart).padding(start = 10.dp))
     }
 }
 
